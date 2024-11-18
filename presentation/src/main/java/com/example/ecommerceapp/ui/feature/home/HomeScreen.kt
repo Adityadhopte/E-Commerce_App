@@ -18,9 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example
-
-.domain.model.Product
+import com.example.domain.model.Product
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
