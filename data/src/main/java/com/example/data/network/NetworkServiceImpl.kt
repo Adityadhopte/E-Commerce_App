@@ -1,7 +1,10 @@
 package com.example.data.network
 
-import com.example.data.model.DataProductModel
-import com.example.domain.model.Product
+import android.util.Log
+import com.example.data.model.response.CategoriesListResponse
+import com.example.data.model.response.ProductListResponse
+import com.example.domain.model.CategoryListModule
+import com.example.domain.model.ProductListModel
 import com.example.domain.network.NetworkService
 import com.example.domain.network.ResultWrapper
 import io.ktor.client.HttpClient
@@ -18,14 +21,32 @@ import io.ktor.util.InternalAPI
 import java.io.IOException
 
 class NetworkServiceImpl(val client: HttpClient) : NetworkService {
-    override suspend fun getProducts(): ResultWrapper<List<Product>> {
+    private val baseUrl = "https://ecommerce-ktor-4641e7ff1b63.herokuapp.com"
+
+    override suspend fun getProducts(category: Int?): ResultWrapper<ProductListModel> {
+        // Modify the URL based on the category
+        val url =  if (category != null) "$baseUrl/products/category/$category" else "$baseUrl/products"
+
+        Log.d("NetworkServiceImpl", "Requesting URL: $url")
+
         return makeWebRequest(
-            url = "https://fakestoreapi.com/products",
+            url = url,
             method = HttpMethod.Get,
-            mapper = { dataModels: List<DataProductModel> ->
-                dataModels.map{it.toProduct()}
+            mapper = { dataModels: ProductListResponse ->
+                dataModels.toProductList()
             }
         )
+    }
+
+    override suspend fun getCategories(): ResultWrapper<CategoryListModule> {
+        val url = "$baseUrl/categories"
+        return makeWebRequest(
+            url = url,
+            method = HttpMethod.Get,
+            mapper = { categories: CategoriesListResponse ->
+                categories.toCategoryList()
+
+    })
     }
 
     @OptIn(InternalAPI::class)
@@ -38,9 +59,10 @@ class NetworkServiceImpl(val client: HttpClient) : NetworkService {
         noinline mapper: ((T) -> R)? = null
     ): ResultWrapper<R> {
         return try {
+            // Perform the HTTP request
             val response = client.request(url) {
                 this.method = method
-                // Apply query parameters
+                // Apply query parameters (if any)
                 url {
                     this.parameters.appendAll(Parameters.build {
                         parameters.forEach { (key, value) ->
@@ -48,29 +70,32 @@ class NetworkServiceImpl(val client: HttpClient) : NetworkService {
                         }
                     })
                 }
-                // Apply headers
+                // Apply custom headers (if any)
                 headers.forEach { (key, value) ->
                     header(key, value)
                 }
-                // Set body for POST, PUT, etc.
+                // Set body if needed (e.g., POST requests)
                 if (body != null) {
                     this.body = body
                 }
-
-                // Set content type
+                // Set the content type
                 contentType(ContentType.Application.Json)
-            }.body<T>()
+            }.body<T>()  // Get the body of the response
+
             val result: R = mapper?.invoke(response) ?: response as R
             ResultWrapper.Success(result)
         } catch (e: ClientRequestException) {
+            Log.e("NetworkServiceImpl", "ClientRequestException: ${e.message}")
             ResultWrapper.Failure(e)
         } catch (e: ServerResponseException) {
+            Log.e("NetworkServiceImpl", "ServerResponseException: ${e.message}")
             ResultWrapper.Failure(e)
         } catch (e: IOException) {
+            Log.e("NetworkServiceImpl", "IOException: ${e.message}")
             ResultWrapper.Failure(e)
         } catch (e: Exception) {
+            Log.e("NetworkServiceImpl", "Exception: ${e.message}")
             ResultWrapper.Failure(e)
         }
     }
-
 }
